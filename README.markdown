@@ -1,3 +1,5 @@
+Forked so I can include the very useful NSAttributedString category from OHAttributedLabel without including the duplicated label code (TTTattributedLabel appears a more clean drop-in replacement for UILabel)
+
 # TTTAttributedLabel
 ## A drop-in replacement for UILabel that supports NSAttributedStrings 
 
