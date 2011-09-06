@@ -23,6 +23,12 @@
 #import <UIKit/UIKit.h>
 #import <CoreText/CoreText.h>
 
+typedef enum {
+    TTTAttributedLabelVerticalAlignmentCenter   = 0,
+    TTTAttributedLabelVerticalAlignmentTop      = 1,
+    TTTAttributedLabelVerticalAlignmentBottom   = 2,
+} TTTAttributedLabelVerticalAlignment;
+
 @class TTTAttributedLabel;
 
 @protocol TTTAttributedLabelDelegate <NSObject>
@@ -39,26 +45,27 @@
 @property (nonatomic, copy) id text;
 @end
 
-typedef NSAttributedString *(^TTTMutableAttributedStringBlock)(NSMutableAttributedString *mutableAttributedString);
-
 @interface TTTAttributedLabel : UILabel <TTTAttributedLabel> {
-    NSMutableAttributedString *_mutableAttributedText;
+@private
+    NSAttributedString *_attributedText;
     CTFramesetterRef _framesetter;
     BOOL _needsFramesetter;
     
-    id <TTTAttributedLabelDelegate> delegate;
+    id _delegate;
     UIDataDetectorTypes _dataDetectorTypes;
     NSArray *_links;
     NSDictionary *_linkAttributes;
+    TTTAttributedLabelVerticalAlignment _verticalAlignment;
     BOOL _userInteractionDisabled;
 }
 
-@property (nonatomic, assign) id delegate;
+@property (nonatomic, assign) id <TTTAttributedLabelDelegate> delegate;
 @property (nonatomic, assign) UIDataDetectorTypes dataDetectorTypes;
 @property (nonatomic, retain) NSDictionary *linkAttributes;
+@property (nonatomic, assign) TTTAttributedLabelVerticalAlignment verticalAlignment;
 @property (readonly, nonatomic, retain) NSArray *links;
 
-- (void)setText:(id)text afterInheritingLabelAttributesAndConfiguringWithBlock:(TTTMutableAttributedStringBlock)block;
+- (void)setText:(id)text afterInheritingLabelAttributesAndConfiguringWithBlock:(NSMutableAttributedString *(^)(NSMutableAttributedString *mutableAttributedString))block;
 - (void)setNeedsFramesetter;
 
 - (void)addLinkToURL:(NSURL *)url withRange:(NSRange)range;

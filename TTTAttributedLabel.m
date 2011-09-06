@@ -44,14 +44,24 @@ static inline CTLineBreakMode CTLineBreakModeFromUILineBreakMode(UILineBreakMode
 }
 
 static inline NSTextCheckingType NSTextCheckingTypeFromUIDataDetectorType(UIDataDetectorTypes dataDetectorType) {
-    switch (dataDetectorType) {
-        case UIDataDetectorTypeAll: return NSTextCheckingTypeAddress | NSTextCheckingTypeDate | NSTextCheckingTypeLink | NSTextCheckingTypePhoneNumber;
-        case UIDataDetectorTypeAddress: return NSTextCheckingTypeAddress;
-        case UIDataDetectorTypeCalendarEvent: return NSTextCheckingTypeDate;
-        case UIDataDetectorTypeLink: return NSTextCheckingTypeLink;
-        case UIDataDetectorTypePhoneNumber: return NSTextCheckingTypePhoneNumber;
-        default: return 0;
+    NSTextCheckingType textCheckingType = 0;
+    if (dataDetectorType & UIDataDetectorTypeAddress) {
+        textCheckingType |= NSTextCheckingTypeAddress;
     }
+    
+    if (dataDetectorType & UIDataDetectorTypeCalendarEvent) {
+        textCheckingType |= NSTextCheckingTypeDate;
+    }
+    
+    if (dataDetectorType & UIDataDetectorTypeLink) {
+        textCheckingType |= NSTextCheckingTypeLink;
+    }
+    
+    if (dataDetectorType & UIDataDetectorTypePhoneNumber) {
+        textCheckingType |= NSTextCheckingTypePhoneNumber;
+    }
+    
+    return textCheckingType;
 }
 
 static inline NSDictionary * NSAttributedStringAttributesFromLabel(UILabel *label) {
@@ -79,30 +89,50 @@ static inline NSDictionary * NSAttributedStringAttributesFromLabel(UILabel *labe
 @interface TTTAttributedLabel ()
 @property (readwrite, nonatomic, copy) NSAttributedString *attributedText;
 @property (readwrite, nonatomic, assign) CTFramesetterRef framesetter;
+@property (readwrite, nonatomic, assign) CTFramesetterRef shadowFramesetter;
+@property (readwrite, nonatomic, assign) CTFramesetterRef highlightFramesetter;
 @property (readwrite, nonatomic, retain) NSArray *links;
 
+- (id)initCommon;
 - (NSArray *)detectedLinksInString:(NSString *)string range:(NSRange)range error:(NSError **)error;
 - (NSTextCheckingResult *)linkAtCharacterIndex:(CFIndex)idx;
 - (NSTextCheckingResult *)linkAtPoint:(CGPoint)p;
 - (NSUInteger)characterIndexAtPoint:(CGPoint)p;
+- (void)drawFramesetter:(CTFramesetterRef)framesetter textRange:(CFRange)textRange inRect:(CGRect)rect context:(CGContextRef)c;
 @end
 
 @implementation TTTAttributedLabel
 @dynamic text;
 @synthesize attributedText = _attributedText;
 @synthesize framesetter = _framesetter;
+@synthesize shadowFramesetter = _shadowFramesetter;
+@synthesize highlightFramesetter = _highlightFramesetter;
 
-@synthesize delegate;
+@synthesize delegate = _delegate;
 @synthesize dataDetectorTypes = _dataDetectorTypes;
 @synthesize links = _links;
 @synthesize linkAttributes = _linkAttributes;
+@synthesize verticalAlignment = _verticalAlignment;
 
 - (id)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (!self) {
         return nil;
     }
-        
+    
+    return [self initCommon];
+}
+
+- (id)initWithCoder:(NSCoder *)coder {
+    self = [super initWithCoder:coder];
+    if (!self) {
+        return nil;
+    }
+    
+    return [self initCommon];
+}
+
+- (id)initCommon {
     self.dataDetectorTypes = UIDataDetectorTypeNone;
     self.links = [NSArray array];
     
@@ -114,20 +144,12 @@ static inline NSDictionary * NSAttributedStringAttributesFromLabel(UILabel *labe
     return self;
 }
 
-- (id)initWithCoder:(NSCoder *)coder {
-    self = [super initWithCoder:coder];
-    if (!self) {
-        return nil;
-    }
-    
-    return [self initWithFrame:self.frame];
-}
-
 - (void)dealloc {
+    if (_framesetter) CFRelease(_framesetter);
+    if (_shadowFramesetter) CFRelease(_shadowFramesetter);
+    if (_highlightFramesetter) CFRelease(_highlightFramesetter);
+    
     [_attributedText release];
-    if (_framesetter) {
-        CFRelease(_framesetter);
-    }
     [_links release];
     [_linkAttributes release];
     [super dealloc];
@@ -136,18 +158,37 @@ static inline NSDictionary * NSAttributedStringAttributesFromLabel(UILabel *labe
 #pragma mark -
 
 - (void)setAttributedText:(NSAttributedString *)text {
-    if (![text isEqualToAttributedString:self.attributedText]) {
-        [self setNeedsFramesetter];
+    if ([text isEqualToAttributedString:self.attributedText]) {
+        return;
     }
     
     [self willChangeValueForKey:@"attributedText"];
     [_attributedText release];
     _attributedText = [text copy];
     [self didChangeValueForKey:@"attributedText"];
+    
+    [self setNeedsFramesetter];
 }
 
 - (void)setNeedsFramesetter {
     _needsFramesetter = YES;
+}
+
+- (CTFramesetterRef)framesetter {
+    if (_needsFramesetter) {
+        @synchronized(self) {
+            if (_framesetter) CFRelease(_framesetter);
+            if (_shadowFramesetter) CFRelease(_shadowFramesetter);
+            if (_highlightFramesetter) CFRelease(_highlightFramesetter);
+            
+            self.framesetter = CTFramesetterCreateWithAttributedString((CFAttributedStringRef)self.attributedText);
+            self.shadowFramesetter = nil;
+            self.highlightFramesetter = nil;
+            _needsFramesetter = NO;
+        }
+    }
+    
+    return _framesetter;
 }
 
 - (BOOL)isUserInteractionEnabled {
@@ -158,9 +199,16 @@ static inline NSDictionary * NSAttributedStringAttributesFromLabel(UILabel *labe
     _userInteractionDisabled = !userInteractionEnabled;
 }
 
+- (BOOL)isExclusiveTouch {
+    return [self.links count] > 0;
+}
+
 #pragma mark -
 
 - (NSArray *)detectedLinksInString:(NSString *)string range:(NSRange)range error:(NSError **)error {
+    if (!string) {
+        return [NSArray array];
+    }
     NSMutableArray *mutableLinks = [NSMutableArray array];
     NSDataDetector *dataDetector = [NSDataDetector dataDetectorWithTypes:NSTextCheckingTypeFromUIDataDetectorType(self.dataDetectorTypes) error:error];
     [dataDetector enumerateMatchesInString:string options:0 range:range usingBlock:^(NSTextCheckingResult *result, NSMatchingFlags flags, BOOL *stop) {
@@ -174,7 +222,7 @@ static inline NSDictionary * NSAttributedStringAttributesFromLabel(UILabel *labe
     self.links = [self.links arrayByAddingObject:result];
     
     if (self.linkAttributes) {
-        NSMutableAttributedString *mutableAttributedString = [[self.attributedText mutableCopy] autorelease];
+        NSMutableAttributedString *mutableAttributedString = [[[NSMutableAttributedString alloc] initWithAttributedString:self.attributedText] autorelease];
         [mutableAttributedString addAttributes:self.linkAttributes range:result.range];
         self.attributedText = mutableAttributedString;        
     }
@@ -228,6 +276,9 @@ static inline NSDictionary * NSAttributedStringAttributesFromLabel(UILabel *labe
         return NSNotFound;
     }
     
+    // Convert tap coordinates (start at top left) to CT coordinates (start at bottom left)
+    p = CGPointMake(p.x, self.bounds.size.height - p.y);
+
     CFIndex idx = NSNotFound;
     CGMutablePathRef path = CGPathCreateMutable();
     CGPathAddRect(path, NULL, textRect);
@@ -236,83 +287,147 @@ static inline NSDictionary * NSAttributedStringAttributesFromLabel(UILabel *labe
     NSUInteger numberOfLines = CFArrayGetCount(lines);
     CGPoint lineOrigins[numberOfLines];
     CTFrameGetLineOrigins(frame, CFRangeMake(0, 0), lineOrigins);
-    for (NSUInteger i = 0; i < numberOfLines; i++) {
-        CGPoint lineOrigin = lineOrigins[i];
-        if (lineOrigin.y > p.y) {
-            CTLineRef line = CFArrayGetValueAtIndex(lines, i);
-            CGPoint relativePoint = CGPointMake(p.x - lineOrigin.x, p.y - lineOrigin.y);
-            idx = CTLineGetStringIndexForPosition(line, relativePoint);
+    NSUInteger lineIndex;
+
+    for (lineIndex = 0; lineIndex < (numberOfLines - 1); lineIndex++) {
+        CGPoint lineOrigin = lineOrigins[lineIndex];
+        if (lineOrigin.y < p.y) {
             break;
         }
     }
+    
+    CGPoint lineOrigin = lineOrigins[lineIndex];
+    CTLineRef line = CFArrayGetValueAtIndex(lines, lineIndex);
+    // Convert CT coordinates to line-relative coordinates
+    CGPoint relativePoint = CGPointMake(p.x - lineOrigin.x, p.y - lineOrigin.y);
+    idx = CTLineGetStringIndexForPosition(line, relativePoint);
+    
     CFRelease(frame);
     CFRelease(path);
-    
+        
     return idx;
 }
 
-#pragma mark -
-#pragma mark TTTAttributedLabel
+- (void)drawFramesetter:(CTFramesetterRef)framesetter textRange:(CFRange)textRange inRect:(CGRect)rect context:(CGContextRef)c {
+    CGMutablePathRef path = CGPathCreateMutable();
+    
+    CGPathAddRect(path, NULL, rect);
+    CTFrameRef frame = CTFramesetterCreateFrame(framesetter, textRange, path, NULL);
+    CTFrameDraw(frame, c);
+    
+    CFRelease(frame);
+    CFRelease(path);
+}
+
+#pragma mark - TTTAttributedLabel
 
 - (void)setText:(id)text {
-    if ([text isKindOfClass:[NSAttributedString class]]) {  
-        [super setText:[(NSAttributedString *)text string]];
-        
-        self.attributedText = text;
-        self.links = [NSArray array];
-        if (self.dataDetectorTypes != UIDataDetectorTypeNone) {
-            for (NSTextCheckingResult *result in [self detectedLinksInString:[text string] range:NSMakeRange(0, [text length]) error:nil]) {
-                [self addLinkWithTextCheckingResult:result];
-            }
-        }
-        
-        return;
-    }
-    
-    [super setText:(NSString *)text];
-}
-
-- (void)setText:(id)text afterInheritingLabelAttributesAndConfiguringWithBlock:(TTTMutableAttributedStringBlock)block {
     if ([text isKindOfClass:[NSString class]]) {
-        text = [[[NSAttributedString alloc] initWithString:text] autorelease];
+        [self setText:text afterInheritingLabelAttributesAndConfiguringWithBlock:nil];
+    } else {
+        self.attributedText = text;
     }
-    
-    NSMutableAttributedString *mutableAttributedString = [[text mutableCopy] autorelease];
-    [mutableAttributedString addAttributes:NSAttributedStringAttributesFromLabel(self) range:NSMakeRange(0, [mutableAttributedString length])];
-    [self setText:block(mutableAttributedString)];
+
+    self.links = [NSArray array];
+    if (self.dataDetectorTypes != UIDataDetectorTypeNone) {
+        for (NSTextCheckingResult *result in [self detectedLinksInString:[self.attributedText string] range:NSMakeRange(0, [text length]) error:nil]) {
+            [self addLinkWithTextCheckingResult:result];
+        }
+    }
+        
+    [super setText:[self.attributedText string]];
 }
 
-#pragma mark -
-#pragma mark UILabel
+- (void)setText:(id)text afterInheritingLabelAttributesAndConfiguringWithBlock:(NSMutableAttributedString *(^)(NSMutableAttributedString *mutableAttributedString))block {
+    if ([text isKindOfClass:[NSString class]]) {
+        self.attributedText = [[[NSAttributedString alloc] initWithString:text] autorelease];
+    }
+    
+    NSMutableAttributedString *mutableAttributedString = [[[NSMutableAttributedString alloc] initWithAttributedString:self.attributedText] autorelease];
+    [mutableAttributedString addAttributes:NSAttributedStringAttributesFromLabel(self) range:NSMakeRange(0, [mutableAttributedString length])];
+    
+    if (block) {
+        [self setText:block(mutableAttributedString)];
+    } else {
+        [self setText:mutableAttributedString];
+    }
+}
+
+#pragma mark - UILabel
+
+- (void)setHighlighted:(BOOL)highlighted {
+    [super setHighlighted:highlighted];
+    [self setNeedsDisplay];
+}
 
 - (void)drawTextInRect:(CGRect)rect {
     if (!self.attributedText) {
         [super drawTextInRect:rect];
-    }
-    
-    if (!self.framesetter || _needsFramesetter) {
-        self.framesetter = CTFramesetterCreateWithAttributedString((CFAttributedStringRef)self.attributedText);
-        _needsFramesetter = NO;   
+        return;
     }
     
     CGContextRef c = UIGraphicsGetCurrentContext();
     CGContextSetTextMatrix(c, CGAffineTransformIdentity);
-    CGContextTranslateCTM(c, 0, self.bounds.size.height);
-    CGContextScaleCTM(c, 1.0, -1.0);
+
+    // Inverts the CTM to match iOS coordinates (otherwise text draws upside-down; Mac OS's system is different)
+    CGContextTranslateCTM(c, 0.0f, self.bounds.size.height);
+    CGContextScaleCTM(c, 1.0f, -1.0f);
     
-    CGMutablePathRef path = CGPathCreateMutable();
-    CGPathAddRect(path, NULL, rect);
-    CTFrameRef frame = CTFramesetterCreateFrame(self.framesetter, CFRangeMake(0, [self.attributedText length]), path, NULL);
-    CTFrameDraw(frame, c);
-    CFRelease(path);
+    CGRect textRect = rect;
+    CFRange textRange = CFRangeMake(0, [self.attributedText length]);
+    CFRange fitRange;
+
+    // First, adjust the text to be in the center vertically, if the text size is smaller than the drawing rect
+    CGSize textSize = CTFramesetterSuggestFrameSizeWithConstraints(self.framesetter, textRange, NULL, textRect.size, &fitRange);
+    
+    if (textSize.height < textRect.size.height) {
+        CGFloat yOffset = 0.0f;
+        switch (self.verticalAlignment) {
+            case TTTAttributedLabelVerticalAlignmentTop:
+                break;
+            case TTTAttributedLabelVerticalAlignmentCenter:
+                yOffset = floorf((textRect.size.height - textSize.height) / 2.0f);
+                break;
+            case TTTAttributedLabelVerticalAlignmentBottom:
+                yOffset = (textRect.size.height - textSize.height);
+                break;
+        }
+        
+        textRect.origin = CGPointMake(textRect.origin.x, textRect.origin.y + yOffset);
+        textRect.size = CGSizeMake(textRect.size.width, textRect.size.height - yOffset);
+    }
+
+    // Second, trace the shadow before the actual text, if we have one
+    if (self.shadowColor && !self.highlighted) {
+        CGRect shadowRect = textRect;
+        // We subtract the height, not add it, because the whole scene is inverted.
+        shadowRect.origin = CGPointMake(shadowRect.origin.x + self.shadowOffset.width, shadowRect.origin.y - self.shadowOffset.height);
+        
+        // Override the text's color attribute to whatever the shadow color is
+        if (!self.shadowFramesetter) {
+            NSMutableAttributedString *shadowAttrString = [[self.attributedText mutableCopy] autorelease];
+            [shadowAttrString addAttribute:(NSString*)kCTForegroundColorAttributeName value:(id)[self.shadowColor CGColor] range:NSMakeRange(0, [self.attributedText length])];
+            self.shadowFramesetter = CTFramesetterCreateWithAttributedString((CFAttributedStringRef)shadowAttrString);
+        }
+                
+        [self drawFramesetter:self.shadowFramesetter textRange:textRange inRect:shadowRect context:c];
+    }
+    
+    // Finally, draw the text or highlighted text itself (on top of the shadow, if there is one)
+    if (self.highlightedTextColor && self.highlighted) {
+        if (!self.highlightFramesetter) {
+            NSMutableAttributedString *mutableAttributedString = [[self.attributedText mutableCopy] autorelease];
+            [mutableAttributedString addAttribute:(NSString *)kCTForegroundColorAttributeName value:(id)[self.highlightedTextColor CGColor] range:NSMakeRange(0, mutableAttributedString.length)];
+            self.highlightFramesetter = CTFramesetterCreateWithAttributedString((CFAttributedStringRef)mutableAttributedString);
+        }
+        
+        [self drawFramesetter:self.highlightFramesetter textRange:textRange inRect:textRect context:c];
+    } else {
+        [self drawFramesetter:self.framesetter textRange:textRange inRect:textRect context:c];
+    }  
 }
 
-#pragma mark -
-#pragma mark UIControl
-
-- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
-    return [self linkAtPoint:point] != nil;
-}
+#pragma mark - UIControl
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
 	UITouch *touch = [touches anyObject];	
@@ -331,7 +446,7 @@ static inline NSDictionary * NSAttributedStringAttributesFromLabel(UILabel *labe
                 }
                 break;
             case NSTextCheckingTypePhoneNumber:
-                if ([self.delegate respondsToSelector:@selector(attributedLabel:didSelectLinkWithPhoneNumber::)]) {
+                if ([self.delegate respondsToSelector:@selector(attributedLabel:didSelectLinkWithPhoneNumber:)]) {
                     [self.delegate attributedLabel:self didSelectLinkWithPhoneNumber:result.phoneNumber];
                 }
                 break;
@@ -343,11 +458,12 @@ static inline NSDictionary * NSAttributedStringAttributesFromLabel(UILabel *labe
                 }
                 break;
         }
+    } else {
+        [self.nextResponder touchesBegan:touches withEvent:event];
     }
 }
 
-#pragma mark -
-#pragma mark UIView
+#pragma mark - UIView
 
 - (CGSize)sizeThatFits:(CGSize)size {
     if (!self.attributedText) {

@@ -20,11 +20,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-static CGFloat const kSummaryTextFontSize = 17;
-
 #import <QuartzCore/QuartzCore.h>
 #import "AttributedTableViewCell.h"
 #import "TTTAttributedLabel.h"
+
+static CGFloat const kSummaryTextFontSize = 17;
 
 static NSRegularExpression *__nameRegularExpression;
 static inline NSRegularExpression * NameRegularExpression() {
@@ -57,17 +57,16 @@ static inline NSRegularExpression * ParenthesisRegularExpression() {
     self.layer.shouldRasterize = YES;
     self.layer.rasterizationScale = [[UIScreen mainScreen] scale];
     
-    _summaryLabel = [[TTTAttributedLabel alloc] initWithFrame:CGRectZero];
+    self.summaryLabel = [[[TTTAttributedLabel alloc] initWithFrame:CGRectZero] autorelease];
     self.summaryLabel.font = [UIFont systemFontOfSize:kSummaryTextFontSize];
     self.summaryLabel.textColor = [UIColor darkGrayColor];
     self.summaryLabel.lineBreakMode = UILineBreakModeWordWrap;
     self.summaryLabel.numberOfLines = 0;
+    self.summaryLabel.linkAttributes = [NSDictionary dictionaryWithObject:[NSNumber numberWithBool:YES] forKey:(NSString *)kCTUnderlineStyleAttributeName];
     
-    NSMutableDictionary *mutableLinkAttributes = [NSMutableDictionary dictionary];
-    [mutableLinkAttributes setObject:[NSNumber numberWithBool:YES] forKey:(NSString*)kCTUnderlineStyleAttributeName];
-    self.summaryLabel.linkAttributes = mutableLinkAttributes;
-    
-    self.selectionStyle = UITableViewCellEditingStyleNone;
+    self.summaryLabel.highlightedTextColor = [UIColor whiteColor];
+    self.summaryLabel.shadowColor = [UIColor colorWithWhite:0.87 alpha:1.0];
+    self.summaryLabel.shadowOffset = CGSizeMake(0.0f, 1.0f);
 
     [self.contentView addSubview:self.summaryLabel];
     
@@ -85,18 +84,17 @@ static inline NSRegularExpression * ParenthesisRegularExpression() {
     _summaryText = [text copy];
     [self didChangeValueForKey:@"summaryText"];
     
-    __block NSRegularExpression *regexp = nil;    
-    [self.summaryLabel setText:self.summaryText afterInheritingLabelAttributesAndConfiguringWithBlock:^NSAttributedString *(NSMutableAttributedString *mutableAttributedString) {
+    [self.summaryLabel setText:self.summaryText afterInheritingLabelAttributesAndConfiguringWithBlock:^NSMutableAttributedString *(NSMutableAttributedString *mutableAttributedString) {
         NSRange stringRange = NSMakeRange(0, [mutableAttributedString length]);
         
-        regexp = NameRegularExpression();
+        NSRegularExpression *regexp = NameRegularExpression();
         NSRange nameRange = [regexp rangeOfFirstMatchInString:[mutableAttributedString string] options:0 range:stringRange];
         UIFont *boldSystemFont = [UIFont boldSystemFontOfSize:kSummaryTextFontSize]; 
-    	CTFontRef boldFont = CTFontCreateWithName((CFStringRef)boldSystemFont.fontName, boldSystemFont.pointSize, NULL);
-    	if (boldFont) {
+        CTFontRef boldFont = CTFontCreateWithName((CFStringRef)boldSystemFont.fontName, boldSystemFont.pointSize, NULL);
+        if (boldFont) {
             [mutableAttributedString addAttribute:(NSString *)kCTFontAttributeName value:(id)boldFont range:nameRange];
             CFRelease(boldFont);
-    	}
+        }
         
         [mutableAttributedString replaceCharactersInRange:nameRange withString:[[[mutableAttributedString string] substringWithRange:nameRange] uppercaseString]];
         
@@ -115,7 +113,7 @@ static inline NSRegularExpression * ParenthesisRegularExpression() {
         return mutableAttributedString;
     }];
     
-    regexp = NameRegularExpression();
+    NSRegularExpression *regexp = NameRegularExpression();
     NSRange linkRange = [regexp rangeOfFirstMatchInString:self.summaryText options:0 range:NSMakeRange(0, [self.summaryText length])];
     NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"http://wikipedia.org/wiki/%@", [self.summaryText substringWithRange:linkRange]]];
     [self.summaryLabel addLinkToURL:url withRange:linkRange];
@@ -123,13 +121,12 @@ static inline NSRegularExpression * ParenthesisRegularExpression() {
 
 + (CGFloat)heightForCellWithText:(NSString *)text {
     CGFloat height = 10.0f;
-    height += ceilf([text sizeWithFont:[UIFont systemFontOfSize:kSummaryTextFontSize] constrainedToSize:CGSizeMake(300.0f, CGFLOAT_MAX) lineBreakMode:UILineBreakModeWordWrap].height);
+    height += ceilf([text sizeWithFont:[UIFont systemFontOfSize:kSummaryTextFontSize] constrainedToSize:CGSizeMake(270.0f, CGFLOAT_MAX) lineBreakMode:UILineBreakModeWordWrap].height);
         
     return height;
 }
 
-#pragma mark -
-#pragma mark UIView
+#pragma mark - UIView
 
 - (void)layoutSubviews {
     self.textLabel.hidden = YES;
