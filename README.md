@@ -9,6 +9,16 @@ Forked so I can include the very useful NSAttributedString category from OHAttri
 
 `TTTAttributedLabel` was created to be a drop-in replacement for `UILabel`, that provided a simple API to styling text with `NSAttributedString` while remaining performant. As a bonus, it also supports link embedding, both automatically with `UIDataDetectorTypes` and manually by specifying a range for a URL, address, phone number, or event.
 
+## Documentation
+
+Online documentation is available at http://mattt.github.com/TTTAttributedLabel/. 
+
+To install the docset directly into your local Xcode organizer, first [install `appledoc`](https://github.com/tomaz/appledoc), and then clone this project and run `appledoc -p TTTAttributedLabel -c "Mattt Thompson" --company-id com.mattt TTTAttributedLabel.*`
+
+## Demo
+
+Build and run the `TTTAttributedLabelExample` project in Xcode to see `TTTAttributedLabel` in action. 
+
 ## Installation
 
 `TTTAttributedLabel` requires the `CoreText` Framework, so the first thing you'll need to do is include the framework into your project. In Xcode 4, go to the project file at the root of your workspace and select your active target. There should be several sections across the top of that window; choose "Build Phases". Next, click "Link Binary With Libraries" to expand that section to see the frameworks currently included in your project. Click the "+" at the bottom left and select "CoreText.framework".
@@ -64,26 +74,14 @@ Inspired by [Olivier Halligon](https://github.com/AliSoftware)'s [OHAttributedLa
 
 Thanks to [Tyler Bunnell](https://github.com/tylerb) for his fix to how touches are mapped onto their corresponding embedded links, [Mark Makdad](https://github.com/makdad) for implementing shadow color and vertical text alignment, and [Daniel Tull](https://github.com/danielctull) for implementing support for highlight color.
 
+## Contact
+
+Mattt Thompson
+
+- http://github.com/mattt
+- http://twitter.com/mattt
+- m@mattt.me
+
 ## License
 
-TTTAttributedLabel is licensed under the MIT License:
-
-  Copyright (c) 2011 Mattt Thompson (http://mattt.me/)
-
-  Permission is hereby granted, free of charge, to any person obtaining a copy
-  of this software and associated documentation files (the "Software"), to deal
-  in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-  copies of the Software, and to permit persons to whom the Software is
-  furnished to do so, subject to the following conditions:
-
-  The above copyright notice and this permission notice shall be included in
-  all copies or substantial portions of the Software.
-
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-  THE SOFTWARE.
+TTTAttributedLabel is available under the MIT license. See the LICENSE file for more info.
