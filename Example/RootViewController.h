@@ -1,4 +1,4 @@
-// AppDelegate.h
+// RootViewController.h
 //
 // Copyright (c) 2011 Mattt Thompson (http://mattt.me)
 // 
@@ -21,13 +21,12 @@
 // THE SOFTWARE.
 
 #import <UIKit/UIKit.h>
+#import "TTTAttributedLabel.h"
 
-@interface AppDelegate : NSObject <UIApplicationDelegate> {
-    UIWindow *_window;
-    UINavigationController *_navigationController;
+@interface RootViewController : UITableViewController <TTTAttributedLabelDelegate, UIActionSheetDelegate> {
+    NSArray *_espressos;
 }
 
-@property (nonatomic, retain) UIWindow *window;
-@property (nonatomic, retain) UINavigationController *navigationController;
+@property (nonatomic) NSArray *espressos;
 
 @end

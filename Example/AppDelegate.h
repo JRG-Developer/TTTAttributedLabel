@@ -1,4 +1,4 @@
-// AttributedTableViewCell.h
+// AppDelegate.h
 //
 // Copyright (c) 2011 Mattt Thompson (http://mattt.me)
 // 
@@ -22,16 +22,12 @@
 
 #import <UIKit/UIKit.h>
 
-@class TTTAttributedLabel;
-
-@interface AttributedTableViewCell : UITableViewCell {
-    NSString *_summaryText;
-    TTTAttributedLabel *_summaryLabel;
+@interface AppDelegate : NSObject <UIApplicationDelegate> {
+    UIWindow *_window;
+    UINavigationController *_navigationController;
 }
 
-@property (nonatomic, copy) NSString *summaryText;
-@property (nonatomic, retain) TTTAttributedLabel *summaryLabel;
-
-+ (CGFloat)heightForCellWithText:(NSString *)text;
+@property (nonatomic, strong) UIWindow *window;
+@property (nonatomic, strong) UINavigationController *navigationController;
 
 @end

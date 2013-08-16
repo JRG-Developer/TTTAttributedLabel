@@ -1,4 +1,4 @@
-// RootViewController.h
+// AttributedTableViewCell.h
 //
 // Copyright (c) 2011 Mattt Thompson (http://mattt.me)
 // 
@@ -21,12 +21,14 @@
 // THE SOFTWARE.
 
 #import <UIKit/UIKit.h>
-#import "TTTAttributedLabel.h"
 
-@interface RootViewController : UITableViewController <TTTAttributedLabelDelegate, UIActionSheetDelegate> {
-    NSArray *_espressos;
-}
+@class TTTAttributedLabel;
 
-@property (nonatomic, retain) NSArray *espressos;
+@interface AttributedTableViewCell : UITableViewCell
+
+@property (nonatomic, copy) NSString *summaryText;
+@property (nonatomic, strong) TTTAttributedLabel *summaryLabel;
+
++ (CGFloat)heightForCellWithText:(NSString *)text;
 
 @end
