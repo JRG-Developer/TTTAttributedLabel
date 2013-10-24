@@ -307,12 +307,21 @@ static inline NSAttributedString * NSAttributedStringBySettingColorFromContext(N
 - (CTFramesetterRef)framesetter {
     if (_needsFramesetter) {
         @synchronized(self) {
-            if (_framesetter) CFRelease(_framesetter);
-            if (_highlightFramesetter) CFRelease(_highlightFramesetter);
             
-            self.framesetter = CTFramesetterCreateWithAttributedString((__bridge CFAttributedStringRef)self.renderedAttributedText);
-            self.highlightFramesetter = nil;
+            if (_framesetter)
+            {
+                CFRelease(_framesetter);
+            }
+            
+            _framesetter = CTFramesetterCreateWithAttributedString((__bridge CFAttributedStringRef)self.renderedAttributedText);
             _needsFramesetter = NO;
+            
+            if (_highlightFramesetter)
+            {
+                CFRelease(_highlightFramesetter);
+                _highlightFramesetter = nil;
+            }
+            
         }
     }
     
@@ -750,6 +759,7 @@ static inline NSAttributedString * NSAttributedStringBySettingColorFromContext(N
                 CGContextAddLineToPoint(c, runBounds.origin.x + runBounds.size.width, y);
                 
                 CGContextStrokePath(c);
+                CFRelease(font);
             }
         }
         
@@ -941,8 +951,9 @@ afterInheritingLabelAttributesAndConfiguringWithBlock:(NSMutableAttributedString
             NSMutableAttributedString *highlightAttributedString = [self.renderedAttributedText mutableCopy];
             [highlightAttributedString addAttribute:(__bridge NSString *)kCTForegroundColorAttributeName value:(id)[self.highlightedTextColor CGColor] range:NSMakeRange(0, highlightAttributedString.length)];
             
-            if (!self.highlightFramesetter) {
-                self.highlightFramesetter = CTFramesetterCreateWithAttributedString((__bridge CFAttributedStringRef)highlightAttributedString);
+            if (!self.highlightFramesetter)
+            {
+                _highlightFramesetter = CTFramesetterCreateWithAttributedString((__bridge CFAttributedStringRef)highlightAttributedString);
             }
             
             [self drawFramesetter:self.highlightFramesetter attributedString:highlightAttributedString textRange:textRange inRect:textRect context:c];

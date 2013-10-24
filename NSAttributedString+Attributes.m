@@ -73,9 +73,18 @@
 						  trait,kCTFontTraitsAttribute,nil];
 	
 	CTFontDescriptorRef desc = CTFontDescriptorCreateWithAttributes((CFDictionaryRef)attr);
-	if (!desc) return;
+
+	if (!desc)
+        return;
+    
 	CTFontRef aFont = CTFontCreateWithFontDescriptor(desc, size, NULL);
-	if (!aFont) return;
+    
+	if (!aFont)
+    {
+        CFRelease(desc);
+        return;
+    }
+    
 	[self addAttribute:(NSString*)kCTFontAttributeName value:(id)aFont range:range];
 	CFRelease(aFont);
 	CFRelease(desc);
